@@ -19,11 +19,6 @@ st.markdown("""
     .res-label { font-size: 0.85rem; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
     .res-price { font-size: 2.2rem; color: #1e293b; font-weight: 800; margin: 10px 0; }
     
-    .guia-box {
-        background: #f0f7ff; padding: 20px; border-radius: 15px;
-        border-left: 6px solid #2563eb; margin-bottom: 25px; color: #1e3a8a;
-    }
-    
     .alerta-manual {
         background: #fff7ed; color: #9a3412; padding: 12px; border-radius: 10px;
         font-size: 0.85rem; font-weight: 700; border: 1px solid #ffedd5; margin: 15px 0;
@@ -42,7 +37,6 @@ def limpiar_monto(texto, nombre_campo="campo"):
     if not texto:
         return 0.0
     texto = str(texto).replace('$', '').replace('₲', '').replace('Gs', '').replace('USD', '').strip()
-    # Manejo de formato paraguayo (punto miles, coma decimal)
     if '.' in texto and ',' in texto:
         if texto.rfind(',') > texto.rfind('.'):
             texto = texto.replace('.', '').replace(',', '.')
@@ -112,21 +106,27 @@ if st.button("🚀 GENERAR PRESUPUESTO", type="primary"):
     g = limpiar_monto(gan_raw, "la ganancia")
     
     if None in (c, t, f, g):
-        st.stop()  # Ya mostró el error específico
+        st.stop()
+    
+    # Validaciones adicionales
+    if c <= 0:
+        st.error("❌ El costo debe ser mayor a cero.")
+        st.stop()
+    if moneda != "PYG" and t <= 0:
+        st.error("❌ La cotización debe ser mayor a cero.")
+        st.stop()
     
     # Cálculos según práctica comercial paraguaya
     costo_base = c * t
     costo_con_proteccion = costo_base * 1.015 if p_cambio else costo_base
     subtotal_con_flete = costo_con_proteccion + f
     
-    # GANANCIA sobre el subtotal (corregido)
     if gan_tipo == "Porcentaje %":
         utilidad = subtotal_con_flete * (g / 100)
     else:
         utilidad = g
     
     base_imponible = subtotal_con_flete + utilidad
-    # IVA correcto: sumar 10% (multiplicar por 1.10)
     precio_efectivo = base_imponible * 1.10 if is_iva else base_imponible
     
     com_map = {"Efectivo / SIPAP": 0.0, "Tarjeta de Crédito (3.3%)": 3.3, "Débito / QR (2.2%)": 2.2}
@@ -169,7 +169,11 @@ if st.button("🚀 GENERAR PRESUPUESTO", type="primary"):
     msg = f"📝 *PRESUPUESTO*\n📦 *Item:* {producto} {variante}\n💳 *Lista:* {formatear_guaranies(precio_lista)} Gs.\n💵 *Efectivo:* {formatear_guaranies(precio_efectivo)} Gs.\n_PrecioJusto PY_"
     st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(msg)}" target="_blank" style="text-decoration:none;"><div style="background-color:#25d366; color:white; padding:15px; border-radius:12px; text-align:center; font-weight:bold;">📲 ENVIAR POR WHATSAPP</div></a>', unsafe_allow_html=True)
 
-    # Scroll automático al final de la página
+    # Botón para nueva operación
+    if st.button("🧹 NUEVA OPERACIÓN"):
+        st.rerun()
+
+    # Scroll automático
     st.markdown("""<script>window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });</script>""", unsafe_allow_html=True)
 
 st.markdown("<p style='text-align:center; color:#94a3b8; font-size:0.75rem; margin-top:50px;'>PRECIOJUSTO PY v3.6 | Optimizado para Celulares | IVA correcto | Ganancia sobre subtotal</p>", unsafe_allow_html=True)
