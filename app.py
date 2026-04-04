@@ -2,7 +2,7 @@ import streamlit as st
 import urllib.parse
 import re
 
-# 1. CONFIGURACIÓN Y ESTILO COMPLETO
+# 1. CONFIGURACIÓN Y ESTILO
 st.set_page_config(page_title="PrecioJusto PY", page_icon="🛡️", layout="centered")
 
 st.markdown("""
@@ -37,20 +37,29 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. MOTOR DE LIMPIEZA ANTICRISTALES (NO SE ROMPE)
-def limpiar_monto(texto):
-    if not texto: return 0.0
+# 2. MOTOR DE LIMPIEZA MEJORADO (INDICA QUÉ CAMPO FALLA)
+def limpiar_monto(texto, nombre_campo="campo"):
+    if not texto:
+        return 0.0
     texto = str(texto).replace('$', '').replace('₲', '').replace('Gs', '').replace('USD', '').strip()
     if '.' in texto and ',' in texto:
-        if texto.rfind(',') > texto.rfind('.'): texto = texto.replace('.', '').replace(',', '.')
-        else: texto = texto.replace(',', '')
+        if texto.rfind(',') > texto.rfind('.'):
+            texto = texto.replace('.', '').replace(',', '.')
+        else:
+            texto = texto.replace(',', '')
     elif ',' in texto:
-        if len(texto.split(',')[-1]) == 3: texto = texto.replace(',', '')
-        else: texto = texto.replace(',', '.')
+        if len(texto.split(',')[-1]) == 3:
+            texto = texto.replace(',', '')
+        else:
+            texto = texto.replace(',', '.')
     elif '.' in texto:
-        if len(texto.split('.')[-1]) == 3: texto = texto.replace('.', '')
-    try: return float(texto)
-    except: return None
+        if len(texto.split('.')[-1]) == 3:
+            texto = texto.replace('.', '')
+    try:
+        return float(texto)
+    except:
+        st.error(f"❌ Error en {nombre_campo}: solo se permiten números, puntos y comas.")
+        return None
 
 def formatear_guaranies(valor):
     return "{:,.0f}".format(round(valor)).replace(",", ".")
@@ -59,16 +68,15 @@ def formatear_guaranies(valor):
 st.title("🛡️ PrecioJusto PY")
 st.markdown("<p style='color:#64748b; font-size:1.1rem; margin-top:-15px;'>Gestión de Reventa v3.5 Pro</p>", unsafe_allow_html=True)
 
-# GUÍA COMPLETA
 with st.expander("📖 Guía de Funciones (Leer antes de usar)", expanded=False):
     st.markdown("""
     - **Cotización:** Ingresá el precio de tu cambista. El sistema NO es automático para evitar errores de costo.
     - **Protección (+1.5%):** Seguro por si la moneda sube antes de reponer stock.
     - **Precio LISTA:** Monto para Tarjeta o QR (Ya incluye comisión bancaria).
     - **Precio EFECTIVO:** Monto neto para SIPAP o Billetes.
+    - **IVA 10%:** Si activás factura legal, se suma el 10% sobre la base imponible.
     """)
 
-# INPUTS (Sin Formulario para que el Enter no moleste)
 st.subheader("📦 1. Datos del producto")
 c1, c2 = st.columns(2)
 producto = c1.text_input("Nombre del producto", placeholder="Ej: iPhone 15 Pro Max")
@@ -95,65 +103,66 @@ is_iva = p1.toggle("Incluir Factura Legal (IVA 10%)")
 p_cambio = p1.toggle("Activar Protección Dólar (+1.5%)", value=True)
 tipo_pago = p2.selectbox("Medio de pago del cliente", ["Efectivo / SIPAP", "Tarjeta de Crédito (3.3%)", "Débito / QR (2.2%)"])
 
-# 4. CÁLCULOS Y RESULTADOS
+# 4. CÁLCULOS Y RESULTADOS (CON IVA CORREGIDO)
 if st.button("🚀 GENERAR PRESUPUESTO", type="primary"):
-    c = limpiar_monto(costo_raw)
-    t = limpiar_monto(tasa_raw)
-    f = limpiar_monto(flete_raw)
-    g = limpiar_monto(gan_raw)
+    c = limpiar_monto(costo_raw, "el costo")
+    t = limpiar_monto(tasa_raw, "la cotización")
+    f = limpiar_monto(flete_raw, "el flete")
+    g = limpiar_monto(gan_raw, "la ganancia")
     
-    if c is None or t is None or f is None or g is None:
-        st.error("❌ Error: Revisá que no haya letras en los campos de dinero.")
-    else:
-        # Lógica de negocio
-        costo_base = c * t
-        costo_con_proteccion = costo_base * 1.015 if p_cambio else costo_base
-        
-        subtotal_con_flete = costo_con_proteccion + f
-        utilidad = (c * t) * (g / 100) if gan_tipo == "Porcentaje %" else g
-        
-        base_para_impuesto = subtotal_con_flete + utilidad
-        precio_efectivo = base_para_impuesto / 0.90 if is_iva else base_para_impuesto
-        
-        com_map = {"Efectivo / SIPAP": 0.0, "Tarjeta de Crédito (3.3%)": 3.3, "Débito / QR (2.2%)": 2.2}
-        comision = com_map[tipo_pago]
-        precio_lista = precio_efectivo / (1 - comision/100) if comision > 0 else precio_efectivo
+    if None in (c, t, f, g):
+        st.stop()  # Ya mostró el error específico
+    
+    # Cálculos correctos
+    costo_base = c * t
+    costo_con_proteccion = costo_base * 1.015 if p_cambio else costo_base
+    subtotal_con_flete = costo_con_proteccion + f
+    utilidad = (costo_base) * (g / 100) if gan_tipo == "Porcentaje %" else g
+    
+    base_imponible = subtotal_con_flete + utilidad
+    # ✅ CORRECCIÓN: multiplicar por 1.10, NO dividir por 0.90
+    precio_efectivo = base_imponible * 1.10 if is_iva else base_imponible
+    
+    com_map = {"Efectivo / SIPAP": 0.0, "Tarjeta de Crédito (3.3%)": 3.3, "Débito / QR (2.2%)": 2.2}
+    comision = com_map[tipo_pago]
+    precio_lista = precio_efectivo / (1 - comision/100) if comision > 0 else precio_efectivo
 
-        # DESPLIEGUE DE RESULTADOS
-        st.markdown("---")
-        r1, r2 = st.columns(2)
-        
-        # Tarjeta Lista
-        r1.markdown(f"""
-            <div class="result-card">
-                <div class="res-label">💳 PRECIO LISTA (Tarjeta/QR)</div>
-                <div class="res-price">{formatear_guaranies(precio_lista)} ₲</div>
-                <small>Incluye comisión del {comision}%</small>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # Tarjeta Efectivo
-        r2.markdown(f"""
-            <div class="result-card" style="border-top:6px solid #10b981;">
-                <div class="res-label">💰 PRECIO EFECTIVO</div>
-                <div class="res-price" style="color:#10b981;">{formatear_guaranies(precio_efectivo)} ₲</div>
-                <small>{"Incluye IVA 10%" if is_iva else "Sin Factura / Sin IVA"}</small>
-            </div>
-        """, unsafe_allow_html=True)
+    # Mostrar resultados
+    st.markdown("---")
+    r1, r2 = st.columns(2)
+    r1.markdown(f"""
+        <div class="result-card">
+            <div class="res-label">💳 PRECIO LISTA (Tarjeta/QR)</div>
+            <div class="res-price">{formatear_guaranies(precio_lista)} ₲</div>
+            <small>Incluye comisión del {comision}%</small>
+        </div>
+    """, unsafe_allow_html=True)
+    r2.markdown(f"""
+        <div class="result-card" style="border-top:6px solid #10b981;">
+            <div class="res-label">💰 PRECIO EFECTIVO</div>
+            <div class="res-price" style="color:#10b981;">{formatear_guaranies(precio_efectivo)} ₲</div>
+            <small>{"Incluye IVA 10%" if is_iva else "Sin Factura / Sin IVA"}</small>
+        </div>
+    """, unsafe_allow_html=True)
 
-        # Desglose para el vendedor
-        with st.expander("📊 Ver desglose detallado de costos"):
-            st.write(f"**Costo Producto:** {formatear_guaranies(costo_base)} ₲")
-            if p_cambio: st.write(f"**Protección (1.5%):** {formatear_guaranies(costo_con_proteccion - costo_base)} ₲")
-            st.write(f"**Flete:** {formatear_guaranies(f)} ₲")
-            st.write(f"**Ganancia neta:** {formatear_guaranies(utilidad)} ₲")
-            if is_iva: st.write(f"**IVA 10%:** {formatear_guaranies(precio_efectivo - base_para_impuesto)} ₲")
+    # Desglose
+    with st.expander("📊 Ver desglose detallado de costos"):
+        st.write(f"**Costo Producto:** {formatear_guaranies(costo_base)} ₲")
+        if p_cambio:
+            proteccion = costo_con_proteccion - costo_base
+            st.write(f"**Protección (1.5%):** {formatear_guaranies(proteccion)} ₲")
+        st.write(f"**Flete:** {formatear_guaranies(f)} ₲")
+        st.write(f"**Ganancia neta:** {formatear_guaranies(utilidad)} ₲")
+        st.write(f"**Base imponible (sin IVA):** {formatear_guaranies(base_imponible)} ₲")
+        if is_iva:
+            iva_calculado = precio_efectivo - base_imponible
+            st.write(f"**IVA 10% (sobre la base):** {formatear_guaranies(iva_calculado)} ₲")
 
-        # Botón WhatsApp
-        msg = f"📝 *PRESUPUESTO*\n📦 *Item:* {producto} {variante}\n💳 *Lista:* {formatear_guaranies(precio_lista)} Gs.\n💵 *Efectivo:* {formatear_guaranies(precio_efectivo)} Gs.\n_PrecioJusto PY_"
-        st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(msg)}" target="_blank" style="text-decoration:none;"><div style="background-color:#25d366; color:white; padding:15px; border-radius:12px; text-align:center; font-weight:bold;">📲 ENVIAR POR WHATSAPP</div></a>', unsafe_allow_html=True)
+    # WhatsApp
+    msg = f"📝 *PRESUPUESTO*\n📦 *Item:* {producto} {variante}\n💳 *Lista:* {formatear_guaranies(precio_lista)} Gs.\n💵 *Efectivo:* {formatear_guaranies(precio_efectivo)} Gs.\n_PrecioJusto PY_"
+    st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(msg)}" target="_blank" style="text-decoration:none;"><div style="background-color:#25d366; color:white; padding:15px; border-radius:12px; text-align:center; font-weight:bold;">📲 ENVIAR POR WHATSAPP</div></a>', unsafe_allow_html=True)
 
-        # Auto-scroll suave al final
-        st.markdown("""<script>window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });</script>""", unsafe_allow_html=True)
+    # Scroll automático (mejor usar un elemento ancla, pero este simple funciona)
+    st.markdown("""<script>window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });</script>""", unsafe_allow_html=True)
 
-st.markdown("<p style='text-align:center; color:#94a3b8; font-size:0.75rem; margin-top:50px;'>PRRECIOJUSTO PY v3.5 | Optimizado para Celulares</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#94a3b8; font-size:0.75rem; margin-top:50px;'>PRECIOJUSTO PY v3.5 | Optimizado para Celulares</p>", unsafe_allow_html=True)
