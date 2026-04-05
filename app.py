@@ -133,4 +133,4 @@ if st.button("🚀 GENERAR PRESUPUESTO", type="primary"):
 
         st.markdown("""<script>window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });</script>""", unsafe_allow_html=True)
 
-st.markdown("<p style='text-align:center; color:#94a3b8; font-size:0.75rem; margin-top:50px;'>Versión Final Pro | Uso Exclusivo</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#94a3b8; font-size:0.75rem; margin-top:50px;'>CALCULADORA v2.1 | © 2026 PRECIOJUSTO</p>", unsafe_allow_html=True)
