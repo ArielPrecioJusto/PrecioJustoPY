@@ -51,7 +51,7 @@ def formatear(valor):
 
 # 3. INTERFAZ Y GUÍA
 st.title("🛡️ PrecioJusto PY")
-st.markdown("<p style='color:#64748b; font-size:1.1rem; margin-top:-15px;'>Herramienta Privada de Cotización</p>", unsafe_allow_html=True)
+st.markdown("<p style='color:#64748b; font-size:1.1rem; margin-top:-15px;'>CALCULADORA DE COSTOS & MÁRGENES</p>", unsafe_allow_html=True)
 
 # Recuperamos la guía que pediste
 with st.expander("📖 Guía de Funciones (Leer antes de usar)", expanded=False):
